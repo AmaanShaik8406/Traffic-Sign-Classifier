@@ -1,0 +1,126 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing import image
+
+# Image parameters
+IMG_HEIGHT = 32
+IMG_WIDTH = 32
+BATCH_SIZE = 32
+NUM_CLASSES = 3
+
+train_datagen = ImageDataGenerator(
+    rescale=1. / 255,
+    rotation_range=10,
+    zoom_range=0.1,
+    width_shift_range=0.1,
+    height_shift_range=0.1,
+    horizontal_flip=False
+)
+
+test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+train_data = train_datagen.flow_from_directory(
+    "Train/",
+    target_size=(32, 32),
+    batch_size=32,
+    class_mode="categorical"
+)
+
+test_data = test_datagen.flow_from_directory(
+    "Test/",
+    target_size=(32, 32),
+    batch_size=32,
+    class_mode="categorical"
+)
+
+class_indices = train_data.class_indices
+index_to_class = {v: k for k, v in class_indices.items()}
+
+print("Class Mapping:", index_to_class)
+
+# -----------------------------
+# Sign Information Dictionary (Using Folder Names)
+# -----------------------------
+sign_info = {
+    "1": {
+        "name": "Stop",
+        "instruction": "Stop the vehicle completely",
+        "action": "Apply brakes and wait until the road is clear"
+    },
+    "2": {
+        "name": "Speed Limit 50",
+        "instruction": "Maximum speed allowed is 50 km/h",
+        "action": "Adjust vehicle speed to 50 km/h or below"
+    },
+    "3": {
+        "name": "No Entry",
+        "instruction": "Vehicles are not allowed to enter",
+        "action": "Do not proceed further"
+    }
+}
+
+# CNN Model
+model = models.Sequential([
+
+    layers.Input(shape=(32, 32, 3)),
+
+    layers.Conv2D(32, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+
+    layers.Conv2D(128, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),
+
+    layers.Dense(NUM_CLASSES, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+history = model.fit(
+    train_data,
+    epochs=15,
+    validation_data=test_data
+)
+
+test_loss, test_accuracy = model.evaluate(test_data)
+print("Test Accuracy:", test_accuracy)
+
+
+def predict_sign(img_path):
+    img = image.load_img(img_path, target_size=(32, 32))
+    img_array = image.img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+
+    prediction = model.predict(img_array)
+    class_index = np.argmax(prediction)
+    confidence = np.max(prediction) * 100
+
+    class_name = index_to_class[class_index]
+
+    print("\nPredicted Sign:", class_name)
+    print("Confidence: {:.2f}%".format(confidence))
+    print("Instruction:", sign_info[class_name]["instruction"])
+    print("Action:", sign_info[class_name]["action"])
+
+    # Show Image
+    plt.imshow(img)
+    plt.title(f"{class_name} ({confidence:.2f}%)")
+    plt.axis("off")
+    plt.show()
+
+
+# Give your test image path
+predict_sign("C://Users//edaan//PycharmProjects//pythonProject1//Train//1//img.png")
